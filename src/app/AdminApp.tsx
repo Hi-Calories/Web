@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Cpu,
   Database,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   Search,
@@ -33,6 +34,7 @@ const AiPromptsView = lazy(() => import("./OtherViews").then((m) => ({ default: 
 const AuditView = lazy(() => import("./OtherViews").then((m) => ({ default: m.AuditView })));
 const SettingsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.SettingsView })));
 const QualityOverviewView = lazy(() => import("./QualityOverviewView").then((m) => ({ default: m.QualityOverviewView })));
+const MicronutrientsView = lazy(() => import("./MicronutrientsView").then((m) => ({ default: m.MicronutrientsView })));
 const AdminProfileModal = lazy(() => import("./AdminProfileModal").then((m) => ({ default: m.AdminProfileModal })));
 
 type Page =
@@ -46,7 +48,8 @@ type Page =
   | "prompts"
   | "activity"
   | "settings"
-  | "quality";
+  | "quality"
+  | "micronutrients";
 
 const nav: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -55,6 +58,7 @@ const nav: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: "ingredients", label: "Kho Nguyên liệu", icon: Database },
   { id: "contributions", label: "Chờ duyệt", icon: ClipboardList },
   { id: "quality", label: "Chất lượng dữ liệu", icon: ShieldCheck },
+  { id: "micronutrients", label: "Duyệt vi chất", icon: FlaskConical },
   { id: "users", label: "Người dùng", icon: Users },
   { id: "quota", label: "AI Quota", icon: Cpu },
   { id: "prompts", label: "AI System Prompts", icon: Terminal },
@@ -140,6 +144,7 @@ export function AdminApp() {
     activity: "Nhật ký hoạt động",
     settings: "Cài đặt hệ thống",
     quality: "Chất lượng dữ liệu Ver 3.1",
+    micronutrients: "Duyệt dữ liệu vi chất Ver 3.2",
   };
 
   return (
@@ -261,6 +266,7 @@ export function AdminApp() {
           {page === "ingredients" && <IngredientsPage query={query} />}
           {page === "contributions" && <ContributionsView />}
           {page === "quality" && <QualityOverviewView />}
+          {page === "micronutrients" && <MicronutrientsView />}
           {page === "users" && <UsersView query={query} />}
           {page === "quota" && <QuotaView />}
           {page === "prompts" && <AiPromptsView />}
