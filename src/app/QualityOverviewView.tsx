@@ -7,6 +7,7 @@ type QualityOverview = {
   frequentlyUsed: Array<{ id: string; name: string; usageCount: number; status: string; imageUrl?: string }>;
   feedback: Array<{ action: string; count: number }>;
 };
+type AiMetrics = { actions: Array<{ action: string; count: number }>; frequentlyCorrectedIngredients: Array<{ name: string; count: number }> };
 
 const labelOf: Record<string, string> = {
   edited: "Đã chỉnh sửa",
@@ -17,6 +18,7 @@ const labelOf: Record<string, string> = {
 
 export function QualityOverviewView() {
   const { data, loading, error, refetch } = useAdminFetch<QualityOverview>("/admin/v31/quality-overview");
+  const metrics = useAdminFetch<AiMetrics>("/admin/v33/ai-metrics");
   if (loading) return <div className="loading-state" role="status">Đang tải chất lượng dữ liệu…</div>;
   if (error || !data) return <div className="error-state"><AlertTriangle size={30} /><p>{error ?? "Không tải được dữ liệu."}</p><button className="primary" onClick={refetch}>Thử lại</button></div>;
   return <section className="quality-overview">
@@ -31,6 +33,9 @@ export function QualityOverviewView() {
       </section>
       <section className="panel"><div className="panel-header"><div><h3>Phản hồi từ kết quả AI</h3><p>Dùng để ưu tiên rà soát prompt và kho nguyên liệu; không tự thay đổi dữ liệu.</p></div><BarChart3 size={20} /></div>
         {data.feedback.length === 0 ? <p className="empty-copy">Chưa có phản hồi AI.</p> : <div className="quality-feedback">{data.feedback.map((item) => <div key={item.action}><span>{labelOf[item.action] ?? item.action}</span><strong>{item.count}</strong></div>)}</div>}
+      </section>
+      <section className="panel"><div className="panel-header"><div><h3>Nguyên liệu bị chỉnh nhiều</h3><p>Tổng hợp ẩn danh từ feedback AI; dùng để kiểm tra lại nhận diện.</p></div><MessageSquareMore size={20} /></div>
+        {metrics.loading ? <p className="empty-copy">Đang tải chỉ số V3.3…</p> : metrics.error || !metrics.data || metrics.data.frequentlyCorrectedIngredients.length === 0 ? <p className="empty-copy">Chưa có dữ liệu correction.</p> : <div className="quality-list">{metrics.data.frequentlyCorrectedIngredients.map((item) => <div className="quality-row" key={item.name}><span className="quality-fallback"><Utensils size={16} /></span><strong>{item.name}</strong><span>{item.count} lần</span></div>)}</div>}
       </section>
     </div>
   </section>;
