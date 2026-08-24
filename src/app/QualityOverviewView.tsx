@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, ImageOff, MessageSquareMore, Utensils } from "lucide-react";
+import { AlertTriangle, BadgeCheck, BarChart3, ImageOff, MessageSquareMore, ScanBarcode, Utensils } from "lucide-react";
 import { useAdminFetch } from "./adminHooks";
 
 type QualityOverview = {
@@ -7,7 +7,13 @@ type QualityOverview = {
   frequentlyUsed: Array<{ id: string; name: string; usageCount: number; status: string; imageUrl?: string }>;
   feedback: Array<{ action: string; count: number }>;
 };
-type AiMetrics = { actions: Array<{ action: string; count: number }>; frequentlyCorrectedIngredients: Array<{ name: string; count: number }> };
+type AiMetrics = {
+  actions: Array<{ action: string; count: number }>;
+  frequentlyCorrectedIngredients: Array<{ name: string; count: number }>;
+  analysisSegments: Array<{ provider: string; category: string; confidenceBand: "high" | "medium" | "low"; count: number }>;
+  barcodeNotFoundCount: number;
+  imageSuggestions: { approved: number; rejected: number };
+};
 
 const labelOf: Record<string, string> = {
   edited: "Đã chỉnh sửa",
@@ -26,6 +32,8 @@ export function QualityOverviewView() {
       <article className="metric-card"><span className="metric-icon-wrap amber"><Utensils size={20} /></span><div><span className="metric-label">Món chờ duyệt</span><strong className="metric-value">{data.pendingFoods}</strong><span className="metric-sub">Cần Admin xác nhận trước khi xuất hiện cho người dùng.</span></div></article>
       <article className="metric-card"><span className="metric-icon-wrap amber"><ImageOff size={20} /></span><div><span className="metric-label">Nguyên liệu thiếu ảnh</span><strong className="metric-value">{data.missingIngredients}</strong><span className="metric-sub">Ưu tiên gán ảnh cho nguyên liệu được dùng nhiều.</span></div></article>
       <article className="metric-card"><span className="metric-icon-wrap"><MessageSquareMore size={20} /></span><div><span className="metric-label">Phản hồi AI</span><strong className="metric-value">{data.feedback.reduce((sum, item) => sum + item.count, 0)}</strong><span className="metric-sub">Chỉ số tổng hợp, không hiển thị dữ liệu bữa ăn riêng tư.</span></div></article>
+      <article className="metric-card"><span className="metric-icon-wrap amber"><ScanBarcode size={20} /></span><div><span className="metric-label">Barcode chưa tìm thấy</span><strong className="metric-value">{metrics.data?.barcodeNotFoundCount ?? "—"}</strong><span className="metric-sub">Tổng cache còn hiệu lực; dùng để ưu tiên bổ sung kho sản phẩm.</span></div></article>
+      <article className="metric-card"><span className="metric-icon-wrap"><BadgeCheck size={20} /></span><div><span className="metric-label">Ảnh AI đã duyệt</span><strong className="metric-value">{metrics.data?.imageSuggestions.approved ?? "—"}</strong><span className="metric-sub">Từ các gợi ý ảnh nguyên liệu, không tự động xuất bản.</span></div></article>
     </div>
     <div className="dashboard-grid-charts">
       <section className="panel"><div className="panel-header"><div><h3>Nguyên liệu được dùng nhiều</h3><p>Ưu tiên bổ sung ảnh và kiểm tra thông tin dinh dưỡng.</p></div></div>
@@ -36,6 +44,10 @@ export function QualityOverviewView() {
       </section>
       <section className="panel"><div className="panel-header"><div><h3>Nguyên liệu bị chỉnh nhiều</h3><p>Tổng hợp ẩn danh từ feedback AI; dùng để kiểm tra lại nhận diện.</p></div><MessageSquareMore size={20} /></div>
         {metrics.loading ? <p className="empty-copy">Đang tải chỉ số V3.3…</p> : metrics.error || !metrics.data || metrics.data.frequentlyCorrectedIngredients.length === 0 ? <p className="empty-copy">Chưa có dữ liệu correction.</p> : <div className="quality-list">{metrics.data.frequentlyCorrectedIngredients.map((item) => <div className="quality-row" key={item.name}><span className="quality-fallback"><Utensils size={16} /></span><strong>{item.name}</strong><span>{item.count} lần</span></div>)}</div>}
+      </section>
+      <section className="panel"><div className="panel-header"><div><h3>Chất lượng nhận diện ảnh</h3><p>Nhóm theo nhà cung cấp, loại món và độ tin cậy; không có ảnh hoặc dữ liệu cá nhân.</p></div><BarChart3 size={20} /></div>
+        {metrics.loading ? <p className="empty-copy">Đang tải chỉ số V3.3…</p> : metrics.error || !metrics.data || metrics.data.analysisSegments.length === 0 ? <p className="empty-copy">Chưa có lượt phân tích để tổng hợp.</p> : <div className="quality-feedback">{metrics.data.analysisSegments.map((item) => <div key={`${item.provider}-${item.category}-${item.confidenceBand}`}><span>{item.provider} · {item.category} · {item.confidenceBand}</span><strong>{item.count}</strong></div>)}</div>}
+        {!metrics.loading && metrics.data ? <p className="metric-sub">Gợi ý ảnh: {metrics.data.imageSuggestions.approved} duyệt · {metrics.data.imageSuggestions.rejected} từ chối.</p> : null}
       </section>
     </div>
   </section>;
