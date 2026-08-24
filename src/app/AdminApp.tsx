@@ -10,6 +10,7 @@ import {
   LogOut,
   Search,
   Settings,
+  ShieldCheck,
   Menu,
   X,
   Terminal,
@@ -31,6 +32,7 @@ const UsersView = lazy(() => import("./OtherViews").then((m) => ({ default: m.Us
 const AiPromptsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.AiPromptsView })));
 const AuditView = lazy(() => import("./OtherViews").then((m) => ({ default: m.AuditView })));
 const SettingsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.SettingsView })));
+const QualityOverviewView = lazy(() => import("./QualityOverviewView").then((m) => ({ default: m.QualityOverviewView })));
 const AdminProfileModal = lazy(() => import("./AdminProfileModal").then((m) => ({ default: m.AdminProfileModal })));
 
 type Page =
@@ -43,7 +45,8 @@ type Page =
   | "quota"
   | "prompts"
   | "activity"
-  | "settings";
+  | "settings"
+  | "quality";
 
 const nav: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -51,6 +54,7 @@ const nav: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: "barcodes", label: "Mã vạch Barcode", icon: Barcode },
   { id: "ingredients", label: "Kho Nguyên liệu", icon: Database },
   { id: "contributions", label: "Chờ duyệt", icon: ClipboardList },
+  { id: "quality", label: "Chất lượng dữ liệu", icon: ShieldCheck },
   { id: "users", label: "Người dùng", icon: Users },
   { id: "quota", label: "AI Quota", icon: Cpu },
   { id: "prompts", label: "AI System Prompts", icon: Terminal },
@@ -135,6 +139,7 @@ export function AdminApp() {
     prompts: "AI System Prompts",
     activity: "Nhật ký hoạt động",
     settings: "Cài đặt hệ thống",
+    quality: "Chất lượng dữ liệu Ver 3.1",
   };
 
   return (
@@ -255,6 +260,7 @@ export function AdminApp() {
           {page === "barcodes" && <BarcodesView query={query} />}
           {page === "ingredients" && <IngredientsPage query={query} />}
           {page === "contributions" && <ContributionsView />}
+          {page === "quality" && <QualityOverviewView />}
           {page === "users" && <UsersView query={query} />}
           {page === "quota" && <QuotaView />}
           {page === "prompts" && <AiPromptsView />}

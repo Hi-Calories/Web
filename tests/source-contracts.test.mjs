@@ -54,3 +54,11 @@ test("settings switch exposes native switch semantics", () => {
   assert.match(settings, /role="switch"/);
   assert.match(settings, /aria-checked=\{checked\}/);
 });
+
+test("quality overview keeps AI feedback aggregated and links to the Ver 3.1 admin surface", () => {
+  const app = read("src/app/AdminApp.tsx");
+  const quality = read("src/app/QualityOverviewView.tsx");
+  assert.match(app, /QualityOverviewView/);
+  assert.match(quality, /\/admin\/v31\/quality-overview/);
+  assert.match(quality, /không hiển thị dữ liệu bữa ăn riêng tư/i);
+});
