@@ -62,3 +62,15 @@ test("quality overview keeps AI feedback aggregated and links to the Ver 3.1 adm
   assert.match(quality, /\/admin\/v31\/quality-overview/);
   assert.match(quality, /không hiển thị dữ liệu bữa ăn riêng tư/i);
 });
+
+test("AI credentials UI keeps secrets write-only and exposes fallback controls", () => {
+  const app = read("src/app/AdminApp.tsx");
+  const credentials = read("src/app/AiCredentialsView.tsx");
+  assert.match(app, /AiCredentialsView/);
+  assert.match(app, /ai-credentials/);
+  assert.match(credentials, /type="password"/);
+  assert.match(credentials, /Không hiển thị key đã lưu/);
+  assert.match(credentials, /\/admin\/ai-credentials\/\$\{credential\.id\}\/revalidate/);
+  assert.match(credentials, /Chuỗi model fallback/);
+  assert.doesNotMatch(credentials, /value=\{credential\?\.apiKey/);
+});
