@@ -8,6 +8,7 @@ import {
   Database,
   FlaskConical,
   LayoutDashboard,
+  KeyRound,
   LogOut,
   Search,
   Settings,
@@ -31,6 +32,7 @@ const QuotaView = lazy(() => import("./QuotaView").then((m) => ({ default: m.Quo
 const ContributionsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.ContributionsView })));
 const UsersView = lazy(() => import("./OtherViews").then((m) => ({ default: m.UsersView })));
 const AiPromptsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.AiPromptsView })));
+const AiCredentialsView = lazy(() => import("./AiCredentialsView").then((m) => ({ default: m.AiCredentialsView })));
 const AuditView = lazy(() => import("./OtherViews").then((m) => ({ default: m.AuditView })));
 const SettingsView = lazy(() => import("./OtherViews").then((m) => ({ default: m.SettingsView })));
 const QualityOverviewView = lazy(() => import("./QualityOverviewView").then((m) => ({ default: m.QualityOverviewView })));
@@ -46,6 +48,7 @@ type Page =
   | "users"
   | "quota"
   | "prompts"
+  | "ai-credentials"
   | "activity"
   | "settings"
   | "quality"
@@ -62,6 +65,7 @@ const nav: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: "users", label: "Người dùng", icon: Users },
   { id: "quota", label: "AI Quota", icon: Cpu },
   { id: "prompts", label: "AI System Prompts", icon: Terminal },
+  { id: "ai-credentials", label: "AI Credentials", icon: KeyRound },
   { id: "activity", label: "Nhật ký hoạt động", icon: Activity },
   { id: "settings", label: "Cài đặt", icon: Settings },
 ];
@@ -141,6 +145,7 @@ export function AdminApp() {
     users: "Quản lý Người dùng",
     quota: "Hạn mức AI Quota",
     prompts: "AI System Prompts",
+    "ai-credentials": "AI Credentials & Fallback",
     activity: "Nhật ký hoạt động",
     settings: "Cài đặt hệ thống",
     quality: "Chất lượng dữ liệu Ver 3.1",
@@ -270,6 +275,7 @@ export function AdminApp() {
           {page === "users" && <UsersView query={query} />}
           {page === "quota" && <QuotaView />}
           {page === "prompts" && <AiPromptsView />}
+          {page === "ai-credentials" && <AiCredentialsView />}
           {page === "activity" && <AuditView />}
           {page === "settings" && <SettingsView />}
           </Suspense>
