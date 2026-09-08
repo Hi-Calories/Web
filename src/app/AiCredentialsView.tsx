@@ -1,88 +1,61 @@
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, KeyRound, Loader2, Plus, RefreshCw, ShieldAlert, Trash2, X } from "lucide-react";
-import { apiFetch } from "../shared/api-client";
-import { useToast } from "../shared/ToastContext";
 import { useAdminFetch } from "./adminHooks";
+import { AiCredentialEditor } from "./AiCredentialEditor";
+import { aiCredentials, credentialsPath, capabilityLabel, type Credential, type CredentialsData } from "../shared/ai-credentials";
+import "./ai-credentials.css";
 
-type Provider = "gemini" | "openai";
-type Capability = "photo_analysis" | "nutrition_estimate" | "ingredient_image";
-type AiModel = { id: string; capability: Capability; priority: number; enabled: boolean; disabledReason?: string; cooldownUntil?: string };
-type Credential = { id: string; provider: Provider; label: string; priority: number; keyFingerprint: string; enabled: boolean; status: "unknown" | "healthy" | "cooldown" | "disabled"; cooldownUntil?: string; lastSuccessAt?: string; lastFailureAt?: string; lastErrorCode?: string; failureCount: number; models: AiModel[]; bootstrappedFromEnvironment: boolean };
-type Alert = { id: string; event: string; provider: string; createdAt: string; emailSentAt?: string; emailError?: string; details?: Record<string, unknown> };
-type Data = { credentials: Credential[]; alerts: Alert[] };
-
-const capabilityLabel: Record<Capability, string> = {
-  photo_analysis: "Quét ảnh món ăn",
-  nutrition_estimate: "Ước tính dinh dưỡng",
-  ingredient_image: "Tạo ảnh nguyên liệu",
-};
-
-const statusLabel: Record<Credential["status"], string> = { healthy: "Hoạt động", unknown: "Chưa kiểm tra", cooldown: "Đang chờ", disabled: "Đã tắt" };
+const statusLabel = { healthy: "Hoạt động", unknown: "Chưa kiểm tra", cooldown: "Có model đang chờ", disabled: "Đã tắt" };
+const eventLabel: Record<string, string> = { credential_disabled: "Key bị vô hiệu hóa", model_disabled: "Model không khả dụng", fallback_exhausted: "Đã thử hết cấu hình AI" };
+const date = (value?: string) => value ? new Date(value).toLocaleString("vi-VN") : "Chưa có";
 
 export function AiCredentialsView() {
-  const { data, loading, error, refetch } = useAdminFetch<Data>("/admin/ai-credentials");
+  const { data, loading, error, refetch } = useAdminFetch<CredentialsData>(credentialsPath);
   const [editing, setEditing] = useState<Credential | null>(null);
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const toast = useToast();
-
-  const mutate = async (id: string, action: () => Promise<unknown>, success: string) => {
-    setBusyId(id);
-    try { await action(); toast.success(success, "Đã cập nhật"); await refetch(); }
-    catch (value) { toast.error(value instanceof Error ? value.message : "Thao tác thất bại.", "Lỗi"); }
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [retry, setRetry] = useState<(() => void) | null>(null);
+  const [notice, setNotice] = useState("");
+  const mutate = async (id: string, action: () => Promise<unknown>) => {
+    setBusyId(id); setMutationError(null); setNotice(""); setRetry(null);
+    try { await action(); setNotice("Đã cập nhật cấu hình."); await refetch(); }
+    catch (value) { setMutationError(value instanceof Error ? value.message : "Thao tác thất bại."); setRetry(() => () => void mutate(id, action)); }
     finally { setBusyId(null); }
   };
-
-  if (loading) return <div className="loading-state"><Loader2 size={36} className="spin" /><p>Đang tải AI credentials…</p></div>;
-  if (error) return <div className="error-state"><AlertCircle size={32} /><p>{error}</p><button className="primary" onClick={refetch}>Thử lại</button></div>;
-  const credentials = data?.credentials ?? [];
-  const alerts = data?.alerts ?? [];
-
-  return <section className="card-list">
-    <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 20 }}>
-      <div><h3 style={{ margin: "0 0 6px", fontSize: 18 }}>AI Credentials & Fallback</h3><p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Key được mã hóa; chỉ fingerprint được hiển thị. Khi model/key limit, hệ thống thử mục có priority kế tiếp.</p></div>
-      <button className="primary" onClick={() => setAdding(true)}><Plus size={16} /> Thêm API key</button>
-    </div>
-    {!credentials.length && <div className="panel"><ShieldAlert size={22} /><strong> Chưa có credential được quản lý.</strong><p>Thêm key sau khi backend đã có AI_CREDENTIALS_ENCRYPTION_KEY.</p></div>}
-    <div style={{ display: "grid", gap: 14 }}>
-      {credentials.map((credential) => <article key={credential.id} className="panel" style={{ padding: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-          <div><div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><KeyRound size={17} /><strong>{credential.label}</strong><span className={`badge ${credential.status === "healthy" ? "approved" : credential.status === "disabled" ? "rejected" : "pending"}`}>{statusLabel[credential.status]}</span></div><p style={{ color: "var(--muted)", fontSize: 13, margin: "7px 0 0" }}>{credential.provider.toUpperCase()} · Key {credential.keyFingerprint} · Ưu tiên {credential.priority}{credential.bootstrappedFromEnvironment ? " · Đã nhập từ Render" : ""}</p></div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button className="secondary" disabled={busyId === credential.id} onClick={() => void mutate(credential.id, () => apiFetch(`/admin/ai-credentials/${credential.id}/revalidate`, { method: "POST" }), "Credential đã được kiểm tra lại")}><RefreshCw size={14} /> Kiểm tra</button>
-            <button className="secondary" disabled={busyId === credential.id} onClick={() => void mutate(credential.id, () => apiFetch(`/admin/ai-credentials/${credential.id}`, { method: "PATCH", body: JSON.stringify({ enabled: !credential.enabled }) }), credential.enabled ? "Đã tắt credential" : "Đã bật credential")}>{credential.enabled ? "Tắt" : "Bật"}</button>
-            <button className="secondary" onClick={() => setEditing(credential)}>Sửa</button>
-            <button className="icon-button" title="Xóa credential" disabled={busyId === credential.id} onClick={() => { if (window.confirm(`Xóa ${credential.label}? API key sẽ không thể khôi phục.`)) void mutate(credential.id, () => apiFetch(`/admin/ai-credentials/${credential.id}`, { method: "DELETE" }), "Đã xóa credential"); }}><Trash2 size={16} color="#dc2626" /></button>
-          </div>
+  const closeEditor = () => { setAdding(false); setEditing(null); void refetch(); };
+  if (editing || adding) return <AiCredentialEditor credential={editing} onClose={closeEditor} onSaved={closeEditor} />;
+  if (loading && !data) return <p role="status">Đang tải cấu hình AI…</p>;
+  if (error) return <div className="error-state" role="alert"><p>{error}</p><button className="primary" onClick={refetch}>Thử lại</button></div>;
+  return <section className="ai-credentials">
+    <header className="ai-header">
+      <div><h3>AI Credentials & Fallback</h3><p>Ưu tiên key có số nhỏ trước; trong mỗi key, thử lần lượt model của chức năng đang dùng.</p></div>
+      <div className="ai-actions"><button className="secondary" onClick={refetch} disabled={Boolean(busyId)}>Làm mới</button><button className="primary" onClick={() => setAdding(true)} disabled={Boolean(busyId)}>Thêm API key</button></div>
+    </header>
+    <p className="ai-notice">Key được mã hóa và không thể xem lại. Nhiều key cùng Google project vẫn dùng chung hạn mức; fallback không tạo thêm quota.</p>
+    {notice && <p role="status">{notice}</p>}
+    {mutationError && <div role="alert" className="login-error"><p>{mutationError}</p><div className="ai-actions"><button className="secondary" disabled={Boolean(busyId)} onClick={() => retry?.()}>Thử lại</button><button className="secondary" onClick={() => { setMutationError(null); setRetry(null); void refetch(); }}>Tải cấu hình mới</button></div></div>}
+    {!data?.credentials.length && <div className="panel"><h4>Chưa có API key</h4><p>Thêm một key và model được provider cấp quyền. Các yêu cầu AI sẽ tạm dừng khi không có cấu hình khả dụng.</p></div>}
+    {data?.credentials.map(credential => <article className="panel ai-credential" key={credential.id} aria-busy={busyId === credential.id}>
+      <div className="ai-header"><div><h4>{credential.label} <span className="badge">{statusLabel[credential.status]}</span></h4><p>{credential.provider.toUpperCase()} · Fingerprint {credential.keyFingerprint} · Ưu tiên {credential.priority}</p></div>
+        <div className="ai-actions">
+          <button className="secondary" disabled={Boolean(busyId)} onClick={() => setEditing(credential)}>Sửa</button>
+          <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (window.confirm("Kiểm tra lại sẽ gọi thử các model, có thể tính phí/quota, và bật lại key nếu thành công. Tiếp tục?")) void mutate(credential.id, () => aiCredentials.revalidate(credential)); }}>Kiểm tra lại</button>
+          <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (credential.enabled || window.confirm("Bật key sẽ xác thực lại model và có thể tính phí/quota. Tiếp tục?")) void mutate(credential.id, () => aiCredentials.toggle(credential)); }}>{credential.enabled ? "Tắt" : "Bật"}</button>
+          <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (window.confirm(`Xóa ${credential.label}? Key đã lưu không thể khôi phục.`)) void mutate(credential.id, () => aiCredentials.remove(credential)); }}>Xóa</button>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>{credential.models.slice().sort((a, b) => a.priority - b.priority).map((model) => <span key={`${model.capability}-${model.id}`} className={`badge ${model.enabled ? "pending" : "rejected"}`}>{capabilityLabel[model.capability]}: {model.id} · #{model.priority}{model.cooldownUntil ? " · cooldown" : ""}</span>)}</div>
-        {(credential.lastErrorCode || credential.cooldownUntil) && <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0 0" }}>Lỗi gần nhất: {credential.lastErrorCode || "tạm thời"}{credential.cooldownUntil ? ` · thử lại sau ${new Date(credential.cooldownUntil).toLocaleString("vi-VN")}` : ""}</p>}
-      </article>)}
-    </div>
-    <div className="panel" style={{ marginTop: 20 }}><h4 style={{ marginTop: 0 }}>Cảnh báo AI gần đây</h4>{alerts.length ? <div style={{ display: "grid", gap: 8 }}>{alerts.map((alert) => <div key={alert.id} style={{ fontSize: 13, display: "flex", justifyContent: "space-between", gap: 12 }}><span><ShieldAlert size={14} style={{ verticalAlign: "-2px" }} /> {alert.event} · {alert.provider}</span><span style={{ color: "var(--muted)" }}>{new Date(alert.createdAt).toLocaleString("vi-VN")} · {alert.emailSentAt ? "đã gửi email" : alert.emailError || "đang chờ email"}</span></div>)}</div> : <p style={{ color: "var(--muted)", marginBottom: 0 }}>Chưa có cảnh báo.</p>}</div>
-    {(adding || editing) && <CredentialModal credential={editing} onClose={() => { setAdding(false); setEditing(null); }} onSaved={() => { setAdding(false); setEditing(null); void refetch(); }} />}
+      </div>
+      {busyId === credential.id && <p role="status">Đang xử lý…</p>}
+      <ul className="ai-chain">{credential.models.slice().sort((a,b) => a.priority - b.priority).map(model => <li key={`${model.capability}:${model.id}`}>
+        <span>{capabilityLabel[model.capability]} · #{model.priority} <strong>{model.id}</strong></span>
+        <span>{!model.enabled ? `Đã tắt · ${model.disabledReason || "thủ công"}` : model.cooldownUntil && new Date(model.cooldownUntil) > new Date() ? `Chờ đến ${date(model.cooldownUntil)}` : "Sẵn sàng"}</span>
+      </li>)}</ul>
+      <p className="ai-meta">Thành công: {date(credential.lastSuccessAt)} · Lỗi: {date(credential.lastFailureAt)}{credential.lastErrorCode ? ` (HTTP ${credential.lastErrorCode})` : ""} · {credential.failureCount} lỗi liên tiếp</p>
+    </article>)}
+    <section className="panel"><h4>Cảnh báo & lịch sử sự cố</h4>
+      {!data?.alerts.length ? <p>Chưa có cảnh báo.</p> : <ul className="ai-alerts">{data.alerts.map(alert => <li key={alert.id}>
+        <div><strong>{eventLabel[alert.event] ?? "Cảnh báo AI"}</strong> · {alert.provider}{alert.details?.model ? ` · ${alert.details.model}` : ""}{alert.details?.capability ? ` · ${capabilityLabel[alert.details.capability]}` : ""}<p>{alert.resolvedAt ? "Đã phục hồi" : "Chưa phục hồi"} · {date(alert.createdAt)}</p></div>
+        <span>{alert.emailSentAt ? "Đã gửi email" : alert.emailError ? `Gửi email chưa thành công (${alert.emailError}) · lần ${alert.emailAttemptCount ?? 1}/5` : "Email đang chờ gửi"}</span>
+      </li>)}</ul>}
+    </section>
   </section>;
-}
-
-function CredentialModal({ credential, onClose, onSaved }: { credential: Credential | null; onClose: () => void; onSaved: () => void }) {
-  const [provider, setProvider] = useState<Provider>(credential?.provider ?? "gemini");
-  const [label, setLabel] = useState(credential?.label ?? "");
-  const [priority, setPriority] = useState(String(credential?.priority ?? 0));
-  const [apiKey, setApiKey] = useState("");
-  const [models, setModels] = useState<AiModel[]>(credential?.models ?? [{ id: "gemini-3.7-flash", capability: "photo_analysis", priority: 0, enabled: true }]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const updateModel = (index: number, patch: Partial<AiModel>) => setModels(models.map((model, current) => current === index ? { ...model, ...patch } : model));
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault(); setSaving(true); setError(null);
-    try {
-      const payload: Record<string, unknown> = { label: label.trim(), priority: Number(priority), models: models.map((model) => ({ id: model.id.trim(), capability: model.capability, priority: Number(model.priority), enabled: model.enabled })) };
-      if (!credential) { payload.provider = provider; payload.apiKey = apiKey.trim(); }
-      else if (apiKey.trim()) payload.apiKey = apiKey.trim();
-      await apiFetch(credential ? `/admin/ai-credentials/${credential.id}` : "/admin/ai-credentials", { method: credential ? "PATCH" : "POST", body: JSON.stringify(payload) });
-      onSaved();
-    } catch (value) { setError(value instanceof Error ? value.message : "Không thể lưu credential."); }
-    finally { setSaving(false); }
-  };
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 720 }}><div className="modal-header"><div><h3>{credential ? "Sửa AI credential" : "Thêm AI credential"}</h3><p>Key chỉ được gửi để mã hóa; không thể xem lại sau khi lưu.</p></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{error && <div className="login-error">{error}</div>}<form onSubmit={submit} style={{ display: "grid", gap: 13 }}><div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 100px", gap: 10 }}><select value={provider} disabled={Boolean(credential)} onChange={(event) => setProvider(event.target.value as Provider)}><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select><input required value={label} placeholder="Nhãn, ví dụ Gemini production 1" onChange={(event) => setLabel(event.target.value)} /><input required type="number" min="0" value={priority} aria-label="Ưu tiên key" onChange={(event) => setPriority(event.target.value)} /></div><div><label>API key {credential ? "mới (để trống nếu giữ key hiện tại)" : ""}</label><input type="password" required={!credential} autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={credential ? "Không hiển thị key đã lưu" : "Nhập API key"} /></div><div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><label>Chuỗi model fallback</label><button type="button" className="secondary" onClick={() => setModels([...models, { id: "", capability: "photo_analysis", priority: models.length, enabled: true }])}>Thêm model</button></div><div style={{ display: "grid", gap: 8, marginTop: 8 }}>{models.map((model, index) => <div key={index} style={{ display: "grid", gridTemplateColumns: "1fr 180px 80px 34px", gap: 8 }}><input required value={model.id} placeholder="Tên model" onChange={(event) => updateModel(index, { id: event.target.value })} /><select value={model.capability} onChange={(event) => updateModel(index, { capability: event.target.value as Capability })}><option value="photo_analysis">Quét ảnh</option><option value="nutrition_estimate">Ước tính</option><option value="ingredient_image" disabled={provider !== "openai"}>Tạo ảnh</option></select><input type="number" min="0" value={model.priority} onChange={(event) => updateModel(index, { priority: Number(event.target.value) })} /><button type="button" className="icon-button" disabled={models.length === 1} onClick={() => setModels(models.filter((_, current) => current !== index))}><Trash2 size={15} /></button></div>)}</div></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary" disabled={saving}>{saving ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}{saving ? "Đang xác thực…" : "Lưu & xác thực"}</button></div></form></div></div>;
 }
