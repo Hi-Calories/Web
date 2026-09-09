@@ -53,6 +53,8 @@ export interface AdminSettingsData {
   retentionDays: number;
 }
 
+const foodIdOf = (food: Food) => food.id || (food as Food & { _id?: string })._id || "";
+
 export function ContributionsView() {
   const { data: foods, loading, error, refetch, setData } = useAdminFetch<Food[]>("/admin/contributions");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -60,15 +62,22 @@ export function ContributionsView() {
   const toast = useToast();
 
   const decide = async (food: Food, decision: "approved" | "rejected") => {
+    const foodId = foodIdOf(food);
+    if (!foodId) {
+      const message = "Món ăn thiếu mã định danh. Vui lòng tải lại danh sách.";
+      setActionError(message);
+      toast.error(message, "Không thể xử lý món");
+      return;
+    }
     setActionError(null);
-    setProcessingId(food.id);
+    setProcessingId(foodId);
     try {
-      await apiFetch(`/admin/contributions/${food.id}`, {
+      await apiFetch(`/admin/contributions/${foodId}`, {
         method: "PATCH",
         body: JSON.stringify({ decision }),
       });
       if (foods) {
-        setData(foods.filter((item) => item.id !== food.id));
+        setData(foods.filter((item) => foodIdOf(item) !== foodId));
       }
       if (decision === "approved") {
         toast.success(`Đã duyệt món "${food.name}" vào cơ sở dữ liệu chính thức.`, "Đã duyệt món");
@@ -89,7 +98,9 @@ export function ContributionsView() {
     setActionError(null);
     try {
       for (const food of foods) {
-        await apiFetch(`/admin/contributions/${food.id}`, {
+        const foodId = foodIdOf(food);
+        if (!foodId) throw new Error(`Món "${food.name}" thiếu mã định danh.`);
+        await apiFetch(`/admin/contributions/${foodId}`, {
           method: "PATCH",
           body: JSON.stringify({ decision: "approved" }),
         });
@@ -156,8 +167,10 @@ export function ContributionsView() {
 
       {items.length > 0 ? (
         <div className="contributions-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
-          {items.map((food) => (
-            <article className="contribution-card" key={food.id} style={{
+          {items.map((food) => {
+            const foodId = foodIdOf(food);
+            return (
+            <article className="contribution-card" key={foodId || food.name} style={{
               background: "white",
               borderRadius: "16px",
               border: "1px solid var(--border)",
@@ -227,7 +240,7 @@ export function ContributionsView() {
                 <button
                   className="secondary"
                   style={{ flex: 1, padding: "8px 12px", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
-                  disabled={processingId === food.id}
+                  disabled={!foodId || processingId === foodId}
                   onClick={() => decide(food, "rejected")}
                 >
                   <X size={15} /> Từ chối
@@ -235,14 +248,14 @@ export function ContributionsView() {
                 <button
                   className="primary"
                   style={{ flex: 1.2, padding: "8px 12px", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
-                  disabled={processingId === food.id}
+                  disabled={!foodId || processingId === foodId}
                   onClick={() => decide(food, "approved")}
                 >
-                  {processingId === food.id ? <Loader2 size={15} className="spin" /> : <Check size={15} />} Duyệt món
+                  {processingId === foodId ? <Loader2 size={15} className="spin" /> : <Check size={15} />} Duyệt món
                 </button>
               </div>
             </article>
-          ))}
+          );})}
         </div>
       ) : (
         <div className="empty" style={{ padding: "48px 20px", textAlign: "center", background: "white", borderRadius: "16px", border: "1px solid var(--border)" }}>
