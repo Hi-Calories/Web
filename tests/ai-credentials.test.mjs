@@ -43,11 +43,13 @@ test("fallback order can be changed without mutating original configuration", ()
   assert.match(validateCredentialInput({ ...credential, models: [credential.models[0], credential.models[0]] }, false), /Không lặp lại/);
 });
 test("credentials screen shows cooldown and safe alert delivery status", async () => {
-  globalThis.__aiTestFetch = async () => ({ credentials: [credential], alerts: [{ id: "alert1", event: "fallback_exhausted", provider: "none", createdAt: "2026-01-01T00:00:00Z", emailError: "EMAIL_503" }] });
+  globalThis.__aiTestFetch = async (path) => path.includes("/usage?") ? ({ days: 30, generatedAt: "2026-01-01T00:00:00Z", summaries: [{ credentialId: credential.id, requests: 10, successes: 8, failures: 2, fallbacks: 3, averageLatencyMs: 420, p95LatencyMs: 900 }], daily: [{ credentialId: credential.id, date: "2026-01-01", requests: 10, successes: 8, failures: 2 }], models: [{ credentialId: credential.id, model: "gemini-example", capability: "photo_analysis", requests: 10, successes: 8, failures: 2, averageLatencyMs: 420 }], errors: [{ credentialId: credential.id, statusCode: 429, count: 2 }], capabilities: [{ credentialId: credential.id, capability: "photo_analysis", requests: 10, successes: 8 }] }) : ({ credentials: [credential], alerts: [{ id: "alert1", event: "fallback_exhausted", provider: "none", createdAt: "2026-01-01T00:00:00Z", emailError: "EMAIL_503" }] });
   render(React.createElement(AiCredentialsView));
   await waitFor(() => assert.ok(screen.getByText(/Chờ đến/)));
   assert.ok(screen.getByText(/Gửi email chưa thành công/));
   assert.ok(screen.getByText(/API key đã kết nối/));
   assert.ok(screen.getAllByText(/•••• 12345678/).length >= 1);
+  assert.ok(screen.getAllByText("80%").length >= 1);
+  assert.ok(screen.getByText(/HTTP 429/));
   assert.equal(document.querySelector('input[type="password"]'), null);
 });
