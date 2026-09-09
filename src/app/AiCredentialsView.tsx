@@ -3,6 +3,7 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  ChevronRight,
   CircleOff,
   Clock3,
   Copy,
@@ -53,6 +54,7 @@ export function AiCredentialsView() {
   const [notice, setNotice] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [usageDays, setUsageDays] = useState(30);
+  const [selectedCredentialId, setSelectedCredentialId] = useState<string | null>(null);
   const usage = useAdminFetch<CredentialUsageData>(credentialUsagePath(usageDays));
   const mutate = async (id: string, action: () => Promise<unknown>) => {
     setBusyId(id); setMutationError(null); setNotice(""); setRetry(null);
@@ -79,6 +81,10 @@ export function AiCredentialsView() {
   const activeCredentials = credentials.filter((credential) => credential.enabled);
   const readyModels = activeCredentials.flatMap((credential) => credential.models).filter((model) => modelState(model).tone === "ready");
   const systemReady = activeCredentials.length > 0 && readyModels.length > 0;
+  const selectedCredential = credentials.find(item => item.id === selectedCredentialId) ?? credentials[0];
+  const selectedIndex = selectedCredential ? credentials.findIndex(item => item.id === selectedCredential.id) : -1;
+  const selectedModels = selectedCredential?.models.slice().sort((a, b) => a.priority - b.priority) ?? [];
+  const selectedReadyCount = selectedModels.filter(model => modelState(model).tone === "ready").length;
 
   return <section className="ai-credentials">
     <header className="ai-page-header">
@@ -105,37 +111,45 @@ export function AiCredentialsView() {
 
     {!credentials.length && <div className="panel ai-empty-state"><div><KeyRound aria-hidden="true" /></div><h3>Chưa có API key</h3><p>Thêm Gemini hoặc OpenAI key và chọn model được cấp quyền. Yêu cầu AI sẽ tạm dừng cho đến khi có cấu hình khả dụng.</p><button className="primary" onClick={() => setAdding(true)}><Plus aria-hidden="true" /> Thêm API key đầu tiên</button></div>}
 
-    <div className="ai-credential-list">
-      {credentials.map((credential, index) => {
-        const models = credential.models.slice().sort((a, b) => a.priority - b.priority);
-        const readyCount = models.filter((model) => modelState(model).tone === "ready").length;
-        return <article className={`ai-credential ${!credential.enabled ? "is-disabled" : ""}`} key={credential.id} aria-busy={busyId === credential.id}>
+    {selectedCredential && <div className="ai-console">
+      <nav className="ai-key-nav" aria-label="Danh sách API key">
+        <header><div><strong>Credentials</strong><span>{credentials.length} key trong fallback</span></div><button type="button" onClick={() => setAdding(true)} aria-label="Thêm API key"><Plus aria-hidden="true" /></button></header>
+        <div>{credentials.map((credential, index) => <button type="button" key={credential.id} className={credential.id === selectedCredential.id ? "is-selected" : ""} onClick={() => setSelectedCredentialId(credential.id)} aria-current={credential.id === selectedCredential.id ? "true" : undefined}>
+          <span className={`ai-provider-mark ${credential.provider}`}>{credential.provider === "gemini" ? "G" : "AI"}</span>
+          <span><strong>{credential.label}</strong><small>{providerLabel[credential.provider]} · •••• {fingerprintTail(credential.keyFingerprint)}</small></span>
+          <span className={`ai-key-dot ${credential.status}`} title={statusLabel[credential.status]} />
+          <ChevronRight aria-hidden="true" />
+        </button>)}</div>
+        <footer><ShieldCheck aria-hidden="true" /> Secrets được mã hóa</footer>
+      </nav>
+      <main className="ai-key-workspace">
+        <article className={`ai-credential ${!selectedCredential.enabled ? "is-disabled" : ""}`} key={selectedCredential.id} aria-busy={busyId === selectedCredential.id}>
           <header className="ai-credential-header">
-            <div className={`ai-provider-mark ${credential.provider}`}>{credential.provider === "gemini" ? "G" : "AI"}</div>
-            <div className="ai-credential-title"><div><h3>{credential.label}</h3><span className={`ai-status ${credential.status}`}>{credential.status === "healthy" ? <CheckCircle2 aria-hidden="true" /> : credential.status === "cooldown" ? <Clock3 aria-hidden="true" /> : credential.status === "disabled" ? <CircleOff aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}{statusLabel[credential.status]}</span></div><p>{providerLabel[credential.provider]} <span>Fallback #{index + 1}</span></p><div className="ai-key-binding"><KeyRound aria-hidden="true" /><span><small>API key đã kết nối</small><strong>•••• {fingerprintTail(credential.keyFingerprint)}</strong></span><button type="button" onClick={() => void copyFingerprint(credential)} aria-label={`Sao chép fingerprint của ${credential.label}`} title="Chỉ sao chép fingerprint an toàn, không phải secret">{copiedId === credential.id ? <CheckCircle2 aria-hidden="true" /> : <Copy aria-hidden="true" />}{copiedId === credential.id ? "Đã sao chép" : "Copy fingerprint"}</button></div></div>
+            <div className={`ai-provider-mark ${selectedCredential.provider}`}>{selectedCredential.provider === "gemini" ? "G" : "AI"}</div>
+            <div className="ai-credential-title"><div><h3>{selectedCredential.label}</h3><span className={`ai-status ${selectedCredential.status}`}>{selectedCredential.status === "healthy" ? <CheckCircle2 aria-hidden="true" /> : selectedCredential.status === "cooldown" ? <Clock3 aria-hidden="true" /> : selectedCredential.status === "disabled" ? <CircleOff aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}{statusLabel[selectedCredential.status]}</span></div><p>{providerLabel[selectedCredential.provider]} <span>Fallback #{selectedIndex + 1}</span></p><div className="ai-key-binding"><KeyRound aria-hidden="true" /><span><small>API key đã kết nối</small><strong>•••• {fingerprintTail(selectedCredential.keyFingerprint)}</strong></span><button type="button" onClick={() => void copyFingerprint(selectedCredential)} aria-label={`Sao chép fingerprint của ${selectedCredential.label}`} title="Chỉ sao chép fingerprint an toàn, không phải secret">{copiedId === selectedCredential.id ? <CheckCircle2 aria-hidden="true" /> : <Copy aria-hidden="true" />}{copiedId === selectedCredential.id ? "Đã sao chép" : "Copy fingerprint"}</button></div></div>
             <div className="ai-credential-actions">
-              <button className="secondary" disabled={Boolean(busyId)} onClick={() => setEditing(credential)}><Pencil aria-hidden="true" /> Sửa</button>
-              <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (window.confirm("Kiểm tra lại sẽ gọi thử các model, có thể tính phí/quota, và bật lại key nếu thành công. Tiếp tục?")) void mutate(credential.id, () => aiCredentials.revalidate(credential)); }}><FlaskConical aria-hidden="true" /> Kiểm tra</button>
-              <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (credential.enabled || window.confirm("Bật key sẽ xác thực lại model và có thể tính phí/quota. Tiếp tục?")) void mutate(credential.id, () => aiCredentials.toggle(credential)); }}><Power aria-hidden="true" /> {credential.enabled ? "Tắt" : "Bật"}</button>
-              <button className="ai-delete-button" aria-label={`Xóa ${credential.label}`} title={`Xóa ${credential.label}`} disabled={Boolean(busyId)} onClick={() => { if (window.confirm(`Xóa ${credential.label}? Key đã lưu không thể khôi phục.`)) void mutate(credential.id, () => aiCredentials.remove(credential)); }}><Trash2 aria-hidden="true" /></button>
+              <button className="secondary" disabled={Boolean(busyId)} onClick={() => setEditing(selectedCredential)}><Pencil aria-hidden="true" /> Sửa</button>
+              <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (window.confirm("Kiểm tra lại sẽ gọi thử các model, có thể tính phí/quota, và bật lại key nếu thành công. Tiếp tục?")) void mutate(selectedCredential.id, () => aiCredentials.revalidate(selectedCredential)); }}><FlaskConical aria-hidden="true" /> Kiểm tra</button>
+              <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (selectedCredential.enabled || window.confirm("Bật key sẽ xác thực lại model và có thể tính phí/quota. Tiếp tục?")) void mutate(selectedCredential.id, () => aiCredentials.toggle(selectedCredential)); }}><Power aria-hidden="true" /> {selectedCredential.enabled ? "Tắt" : "Bật"}</button>
+              <button className="ai-delete-button" aria-label={`Xóa ${selectedCredential.label}`} title={`Xóa ${selectedCredential.label}`} disabled={Boolean(busyId)} onClick={() => { if (window.confirm(`Xóa ${selectedCredential.label}? Key đã lưu không thể khôi phục.`)) void mutate(selectedCredential.id, () => aiCredentials.remove(selectedCredential)); }}><Trash2 aria-hidden="true" /></button>
             </div>
           </header>
 
-          {busyId === credential.id && <div className="ai-processing" role="status"><RefreshCw aria-hidden="true" /> Đang xử lý cấu hình…</div>}
-          <div className="ai-model-heading"><div><strong>{models.length} model đã cấu hình</strong><span>Thử theo thứ tự bên dưới</span></div><span className={readyCount ? "is-ready" : "needs-attention"}>{readyCount}/{models.length} sẵn sàng</span></div>
-          <ol className="ai-chain">{models.map((model, modelIndex) => {
+          {busyId === selectedCredential.id && <div className="ai-processing" role="status"><RefreshCw aria-hidden="true" /> Đang xử lý cấu hình…</div>}
+          <div className="ai-model-heading"><div><strong>{selectedModels.length} model đã cấu hình</strong><span>Thử theo thứ tự bên dưới</span></div><span className={selectedReadyCount ? "is-ready" : "needs-attention"}>{selectedReadyCount}/{selectedModels.length} sẵn sàng</span></div>
+          <ol className="ai-chain">{selectedModels.map((model, modelIndex) => {
             const state = modelState(model);
             return <li key={`${model.capability}:${model.id}`}>
               <span className="ai-model-order">{modelIndex + 1}</span>
-              <span className="ai-model-identity"><strong>{model.id}</strong><small>{capabilityLabel[model.capability]}</small><small className="ai-model-key"><KeyRound aria-hidden="true" /> Dùng key •••• {fingerprintTail(credential.keyFingerprint)}</small></span>
+              <span className="ai-model-identity"><strong>{model.id}</strong><small>{capabilityLabel[model.capability]}</small><small className="ai-model-key"><KeyRound aria-hidden="true" /> Dùng key •••• {fingerprintTail(selectedCredential.keyFingerprint)}</small></span>
               <span className={`ai-model-state ${state.tone}`}>{state.tone === "ready" ? <CheckCircle2 aria-hidden="true" /> : state.tone === "waiting" ? <Clock3 aria-hidden="true" /> : <CircleOff aria-hidden="true" />}<span><strong>{state.label}</strong><small>{state.detail}</small></span></span>
             </li>;
           })}</ol>
-          <footer className="ai-credential-meta"><span><strong>Thành công gần nhất</strong>{date(credential.lastSuccessAt)}</span><span><strong>Lỗi gần nhất</strong>{date(credential.lastFailureAt)}{credential.lastErrorCode ? ` · HTTP ${credential.lastErrorCode}` : ""}</span><span><strong>Lỗi liên tiếp</strong>{credential.failureCount}</span></footer>
-          <AiCredentialUsage credential={credential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} />
-        </article>;
-      })}
-    </div>
+          <footer className="ai-credential-meta"><span><strong>Thành công gần nhất</strong>{date(selectedCredential.lastSuccessAt)}</span><span><strong>Lỗi gần nhất</strong>{date(selectedCredential.lastFailureAt)}{selectedCredential.lastErrorCode ? ` · HTTP ${selectedCredential.lastErrorCode}` : ""}</span><span><strong>Lỗi liên tiếp</strong>{selectedCredential.failureCount}</span></footer>
+          <AiCredentialUsage credential={selectedCredential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} />
+        </article>
+      </main>
+    </div>}
 
     <section className="panel ai-alert-panel"><header><div><AlertTriangle aria-hidden="true" /><div><h3>Cảnh báo và lịch sử sự cố</h3><p>Theo dõi việc đổi model, đổi key và trạng thái gửi cảnh báo.</p></div></div><span>{data?.alerts.length ?? 0} sự kiện</span></header>
       {!data?.alerts.length ? <div className="ai-no-alerts"><CheckCircle2 aria-hidden="true" /> Chưa có cảnh báo. Hệ thống chưa ghi nhận sự cố fallback.</div> : <ul className="ai-alerts">{data.alerts.map(alert => <li key={alert.id}>
