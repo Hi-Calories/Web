@@ -5,8 +5,15 @@ export type AiModel = { id: string; capability: Capability; priority: number; en
 export type Credential = { id: string; revision: number; provider: Provider; label: string; priority: number; keyFingerprint: string; enabled: boolean; status: "unknown" | "healthy" | "cooldown" | "disabled"; lastSuccessAt?: string; lastFailureAt?: string; lastErrorCode?: string; failureCount: number; models: AiModel[]; bootstrappedFromEnvironment: boolean };
 export type AiAlert = { id: string; event: string; provider: string; createdAt: string; resolvedAt?: string; emailSentAt?: string; emailError?: string; emailAttemptCount?: number; details?: { model?: string; capability?: Capability; status?: number } };
 export type CredentialsData = { credentials: Credential[]; alerts: AiAlert[] };
+export type CredentialUsageSummary = { credentialId: string; requests: number; successes: number; failures: number; fallbacks: number; averageLatencyMs: number; p95LatencyMs: number };
+export type CredentialUsageDaily = { credentialId: string; date: string; requests: number; successes: number; failures: number };
+export type CredentialUsageModel = { credentialId: string; model: string; capability: Capability; requests: number; successes: number; failures: number; averageLatencyMs: number };
+export type CredentialUsageError = { credentialId: string; statusCode: number; count: number };
+export type CredentialUsageCapability = { credentialId: string; capability: Capability; requests: number; successes: number };
+export type CredentialUsageData = { days: number; generatedAt: string; summaries: CredentialUsageSummary[]; daily: CredentialUsageDaily[]; models: CredentialUsageModel[]; errors: CredentialUsageError[]; capabilities: CredentialUsageCapability[] };
 export type CredentialInput = { provider: Provider; label: string; priority: number; apiKey?: string; models: AiModel[] };
 export const credentialsPath = "/admin/ai-credentials";
+export const credentialUsagePath = (days: number) => `${credentialsPath}/usage?days=${days}`;
 export const aiCredentials = {
   save: (input: CredentialInput, credential?: Credential | null) => {
     const { provider, ...changes } = input;

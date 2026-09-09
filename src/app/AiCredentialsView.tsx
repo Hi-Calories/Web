@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleOff,
   Clock3,
+  Copy,
   FlaskConical,
   KeyRound,
   Pencil,
@@ -16,7 +17,8 @@ import {
 } from "lucide-react";
 import { useAdminFetch } from "./adminHooks";
 import { AiCredentialEditor } from "./AiCredentialEditor";
-import { aiCredentials, credentialsPath, capabilityLabel, type AiModel, type Credential, type CredentialsData } from "../shared/ai-credentials";
+import { AiCredentialUsage } from "./AiCredentialUsage";
+import { aiCredentials, credentialUsagePath, credentialsPath, capabilityLabel, type AiModel, type Credential, type CredentialsData, type CredentialUsageData } from "../shared/ai-credentials";
 import "./ai-credentials.css";
 
 const statusLabel = {
@@ -49,6 +51,9 @@ export function AiCredentialsView() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [retry, setRetry] = useState<(() => void) | null>(null);
   const [notice, setNotice] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [usageDays, setUsageDays] = useState(30);
+  const usage = useAdminFetch<CredentialUsageData>(credentialUsagePath(usageDays));
   const mutate = async (id: string, action: () => Promise<unknown>) => {
     setBusyId(id); setMutationError(null); setNotice(""); setRetry(null);
     try { await action(); setNotice("Đã cập nhật cấu hình."); await refetch(); }
@@ -56,6 +61,16 @@ export function AiCredentialsView() {
     finally { setBusyId(null); }
   };
   const closeEditor = () => { setAdding(false); setEditing(null); void refetch(); };
+  const fingerprintTail = (value: string) => value.replace(/^[.…]+/, "").slice(-8);
+  const copyFingerprint = async (credential: Credential) => {
+    try {
+      await navigator.clipboard.writeText(credential.keyFingerprint);
+      setCopiedId(credential.id);
+      window.setTimeout(() => setCopiedId((current) => current === credential.id ? null : current), 1800);
+    } catch {
+      setMutationError("Trình duyệt không cho phép sao chép. Hãy chọn fingerprint và sao chép thủ công.");
+    }
+  };
   if (editing || adding) return <AiCredentialEditor credential={editing} onClose={closeEditor} onSaved={closeEditor} />;
   if (loading && !data) return <div className="ai-loading" role="status"><RefreshCw aria-hidden="true" /> Đang tải cấu hình AI…</div>;
   if (error) return <div className="error-state ai-load-error" role="alert"><AlertTriangle aria-hidden="true" /><div><strong>Không thể tải cấu hình AI</strong><p>{error}</p></div><button className="primary" onClick={refetch}>Thử lại</button></div>;
@@ -67,7 +82,7 @@ export function AiCredentialsView() {
 
   return <section className="ai-credentials">
     <header className="ai-page-header">
-      <div><p className="ai-eyebrow">CẤU HÌNH ĐANG SỬ DỤNG</p><h2>API key và chuỗi fallback</h2><p>Hệ thống thử key từ trên xuống; trong mỗi key, model có thứ tự nhỏ hơn được ưu tiên trước.</p></div>
+      <div><h2>API key và chuỗi fallback</h2><p>Hệ thống thử key từ trên xuống; trong mỗi key, model có thứ tự nhỏ hơn được ưu tiên trước.</p></div>
       <div className="ai-actions"><button className="secondary" onClick={refetch} disabled={Boolean(busyId)}><RefreshCw aria-hidden="true" /> Làm mới</button><button className="primary" onClick={() => setAdding(true)} disabled={Boolean(busyId)}><Plus aria-hidden="true" /> Thêm API key</button></div>
     </header>
 
@@ -84,6 +99,7 @@ export function AiCredentialsView() {
     </div>
 
     <p className="ai-security-note"><ShieldCheck aria-hidden="true" /><span><strong>Secret được bảo vệ.</strong> Bạn chỉ thấy fingerprint để nhận diện key. Các key thuộc cùng Google project vẫn dùng chung hạn mức.</span></p>
+    <div className="ai-usage-toolbar"><div><strong>Theo dõi sử dụng từng key</strong><span>Chỉ số vận hành không chứa prompt, ảnh hay dữ liệu người dùng.</span></div><label>Khoảng thời gian<select value={usageDays} onChange={event => setUsageDays(Number(event.target.value))}><option value={7}>7 ngày</option><option value={30}>30 ngày</option><option value={90}>90 ngày</option></select></label></div>
     {notice && <p className="ai-success-message" role="status"><CheckCircle2 aria-hidden="true" /> {notice}</p>}
     {mutationError && <div role="alert" className="login-error"><p>{mutationError}</p><div className="ai-actions"><button className="secondary" disabled={Boolean(busyId)} onClick={() => retry?.()}>Thử lại</button><button className="secondary" onClick={() => { setMutationError(null); setRetry(null); void refetch(); }}>Tải cấu hình mới</button></div></div>}
 
@@ -96,7 +112,7 @@ export function AiCredentialsView() {
         return <article className={`ai-credential ${!credential.enabled ? "is-disabled" : ""}`} key={credential.id} aria-busy={busyId === credential.id}>
           <header className="ai-credential-header">
             <div className={`ai-provider-mark ${credential.provider}`}>{credential.provider === "gemini" ? "G" : "AI"}</div>
-            <div className="ai-credential-title"><div><h3>{credential.label}</h3><span className={`ai-status ${credential.status}`}>{credential.status === "healthy" ? <CheckCircle2 aria-hidden="true" /> : credential.status === "cooldown" ? <Clock3 aria-hidden="true" /> : credential.status === "disabled" ? <CircleOff aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}{statusLabel[credential.status]}</span></div><p>{providerLabel[credential.provider]} <span className="ai-fingerprint">Fingerprint {credential.keyFingerprint}</span> <span>Fallback #{index + 1}</span></p></div>
+            <div className="ai-credential-title"><div><h3>{credential.label}</h3><span className={`ai-status ${credential.status}`}>{credential.status === "healthy" ? <CheckCircle2 aria-hidden="true" /> : credential.status === "cooldown" ? <Clock3 aria-hidden="true" /> : credential.status === "disabled" ? <CircleOff aria-hidden="true" /> : <FlaskConical aria-hidden="true" />}{statusLabel[credential.status]}</span></div><p>{providerLabel[credential.provider]} <span>Fallback #{index + 1}</span></p><div className="ai-key-binding"><KeyRound aria-hidden="true" /><span><small>API key đã kết nối</small><strong>•••• {fingerprintTail(credential.keyFingerprint)}</strong></span><button type="button" onClick={() => void copyFingerprint(credential)} aria-label={`Sao chép fingerprint của ${credential.label}`} title="Chỉ sao chép fingerprint an toàn, không phải secret">{copiedId === credential.id ? <CheckCircle2 aria-hidden="true" /> : <Copy aria-hidden="true" />}{copiedId === credential.id ? "Đã sao chép" : "Copy fingerprint"}</button></div></div>
             <div className="ai-credential-actions">
               <button className="secondary" disabled={Boolean(busyId)} onClick={() => setEditing(credential)}><Pencil aria-hidden="true" /> Sửa</button>
               <button className="secondary" disabled={Boolean(busyId)} onClick={() => { if (window.confirm("Kiểm tra lại sẽ gọi thử các model, có thể tính phí/quota, và bật lại key nếu thành công. Tiếp tục?")) void mutate(credential.id, () => aiCredentials.revalidate(credential)); }}><FlaskConical aria-hidden="true" /> Kiểm tra</button>
@@ -111,11 +127,12 @@ export function AiCredentialsView() {
             const state = modelState(model);
             return <li key={`${model.capability}:${model.id}`}>
               <span className="ai-model-order">{modelIndex + 1}</span>
-              <span className="ai-model-identity"><strong>{model.id}</strong><small>{capabilityLabel[model.capability]}</small></span>
+              <span className="ai-model-identity"><strong>{model.id}</strong><small>{capabilityLabel[model.capability]}</small><small className="ai-model-key"><KeyRound aria-hidden="true" /> Dùng key •••• {fingerprintTail(credential.keyFingerprint)}</small></span>
               <span className={`ai-model-state ${state.tone}`}>{state.tone === "ready" ? <CheckCircle2 aria-hidden="true" /> : state.tone === "waiting" ? <Clock3 aria-hidden="true" /> : <CircleOff aria-hidden="true" />}<span><strong>{state.label}</strong><small>{state.detail}</small></span></span>
             </li>;
           })}</ol>
           <footer className="ai-credential-meta"><span><strong>Thành công gần nhất</strong>{date(credential.lastSuccessAt)}</span><span><strong>Lỗi gần nhất</strong>{date(credential.lastFailureAt)}{credential.lastErrorCode ? ` · HTTP ${credential.lastErrorCode}` : ""}</span><span><strong>Lỗi liên tiếp</strong>{credential.failureCount}</span></footer>
+          <AiCredentialUsage credential={credential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} />
         </article>;
       })}
     </div>
