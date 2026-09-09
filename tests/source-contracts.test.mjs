@@ -61,6 +61,17 @@ test("settings switch exposes native switch semantics", () => {
   assert.match(settings, /aria-checked=\{checked\}/);
 });
 
+test("micronutrients and settings use the responsive admin workspace", () => {
+  const micronutrients = read("src/app/MicronutrientsView.tsx");
+  const settings = read("src/app/OtherViews.tsx");
+  const css = read("src/app/admin-sections.css");
+  assert.match(micronutrients, /micronutrient-layout/);
+  assert.match(micronutrients, /Chưa có nguyên liệu đã duyệt/);
+  assert.match(settings, /settings-workspace/);
+  assert.match(settings, /system-state/);
+  assert.match(css, /@media \(max-width: 640px\)/);
+});
+
 test("quality overview keeps AI feedback aggregated and links to the Ver 3.1 admin surface", () => {
   const app = read("src/app/AdminApp.tsx");
   const quality = read("src/app/QualityOverviewView.tsx");
