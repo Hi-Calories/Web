@@ -23,6 +23,7 @@ import { useAdminAuth } from "./AdminAuthContext";
 import { AdminLogin } from "./AdminLogin";
 import { BrandLogo } from "../shared/ui/BrandLogo";
 import { apiFetch } from "../shared/api-client";
+import { AdminNotificationCenter } from "./AdminNotificationCenter";
 
 const DashboardView = lazy(() => import("./DashboardView").then((m) => ({ default: m.DashboardView })));
 const FoodsView = lazy(() => import("./FoodsView").then((m) => ({ default: m.FoodsView })));
@@ -249,6 +250,7 @@ export function AdminApp() {
                 placeholder="Tìm nhanh dữ liệu..."
               />
             </label>}
+            <AdminNotificationCenter onNavigate={changePage} />
             <button className="icon-button" onClick={() => setShowProfileModal(true)} title="Hồ sơ quản trị viên">
               <UserCheck size={18} />
             </button>
