@@ -16,6 +16,15 @@ test("admin shell exposes a mobile menu and contextual search", () => {
   assert.match(app, /sidebarOpen/);
   assert.match(app, /mobile-only/);
   assert.match(app, /\["foods", "barcodes", "ingredients", "users"\]/);
+  assert.match(app, /AdminNotificationCenter/);
+});
+
+test("admin notification center exposes actionable and accessible system alerts", () => {
+  const center = read("src/app/AdminNotificationCenter.tsx");
+  assert.match(center, /\/admin\/notifications/);
+  assert.match(center, /aria-expanded=\{open\}/);
+  assert.match(center, /Đánh dấu đã đọc/);
+  assert.match(center, /onNavigate\(item\.targetPage\)/);
 });
 
 test("all modal cards declare dialog semantics", () => {
