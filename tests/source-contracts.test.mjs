@@ -42,6 +42,12 @@ test("local API fallback is development-only and auth is session-scoped", () => 
   assert.doesNotMatch(client, /localStorage/);
 });
 
+test("deployment documentation points to the canonical Render backend", () => {
+  const deploymentConfig = [read(".env.example"), read("README.md"), read("AGENTS.md")].join("\n");
+  assert.match(deploymentConfig, /https:\/\/hi-calories-be\.onrender\.com/);
+  assert.doesNotMatch(deploymentConfig, /https:\/\/hi-calories-api\.onrender\.com/);
+});
+
 test("nutrition editors do not inject fabricated defaults or heuristic fallback", () => {
   const foods = read("src/app/FoodsView.tsx");
   const ingredients = read("src/app/IngredientsPage.tsx");
