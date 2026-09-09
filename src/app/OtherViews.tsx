@@ -6,6 +6,8 @@ import {
   Edit3,
   Loader2,
   Plus,
+  Save,
+  Settings2,
   ShieldCheck,
   Trash2,
   X,
@@ -16,6 +18,7 @@ import { apiFetch } from "../shared/api-client";
 import { useAdminFetch } from "./adminHooks";
 import { useToast } from "../shared/ToastContext";
 import type { Food } from "./FoodDetailModal";
+import "./admin-sections.css";
 
 export interface UserItem {
   id: string;
@@ -800,65 +803,36 @@ export function SettingsView() {
     );
   }
 
-  return (
-    <section className="card-list" style={{ maxWidth: "720px" }}>
-      <article className="panel" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        <div className="panel-head">
-          <div>
-            <h3>Quy tắc vận hành & Kiểm duyệt</h3>
-            <p>Cấu hình các chính sách toàn hệ thống Hi-calories.</p>
-          </div>
-        </div>
-
-        <Switch
-          label="Bắt buộc kiểm duyệt món đóng góp từ cộng đồng"
-          checked={settings.moderationRequired}
-          onChange={(value) => setData({ ...settings, moderationRequired: value })}
-        />
-
-        <div className="setting-field">
-          <div>
-            <strong style={{ display: "block", fontSize: "14px" }}>Thời hạn lưu ảnh bữa ăn</strong>
-            <small style={{ color: "var(--muted)" }}>Ảnh món ăn tự động xóa sau thời gian này nếu người dùng bật lưu lịch sử.</small>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <input
-              type="number"
-              min="1"
-              max="365"
-              value={settings.retentionDays}
-              onChange={(e) => setData({ ...settings, retentionDays: Number(e.target.value) })}
-            />
-            <span style={{ fontSize: "14px", fontWeight: 600 }}>ngày</span>
-          </div>
-        </div>
-
-        <Switch
-          label="Chế độ bảo trì hệ thống"
-          checked={settings.maintenanceMode}
-          onChange={(value) => setData({ ...settings, maintenanceMode: value })}
-        />
-
-        <button className="primary" onClick={() => void save()} disabled={saving} style={{ width: "fit-content", marginTop: "8px" }}>
-          {saving ? "Đang lưu..." : "Lưu toàn bộ cài đặt"}
-        </button>
-      </article>
-    </section>
-  );
+  return <section className="admin-workspace settings-workspace">
+    <header className="workspace-header"><div><h2>Cài đặt vận hành</h2><p>Kiểm soát quy trình kiểm duyệt, lưu trữ và trạng thái phục vụ của toàn hệ thống.</p></div><span className={`system-state ${settings.maintenanceMode ? "warning" : "healthy"}`}>{settings.maintenanceMode ? "Đang bảo trì" : "Hệ thống hoạt động"}</span></header>
+    <article className="workspace-panel settings-panel">
+      <header><div className="settings-heading-icon"><Settings2 aria-hidden="true" /></div><div><h3>Quy tắc toàn hệ thống</h3><p>Thay đổi có hiệu lực ngay sau khi lưu.</p></div></header>
+      <div className="settings-list">
+        <Switch label="Kiểm duyệt món cộng đồng" description="Món người dùng đóng góp phải được Admin duyệt trước khi xuất hiện trong kho chung." checked={settings.moderationRequired} onChange={(value) => setData({ ...settings, moderationRequired: value })} />
+        <div className="setting-row"><div><strong>Thời hạn lưu ảnh bữa ăn</strong><p>Tự động xóa ảnh lịch sử sau khoảng thời gian đã chọn.</p></div><label className="retention-input"><span className="sr-only">Số ngày lưu ảnh</span><input type="number" min="1" max="365" value={settings.retentionDays} onChange={(e) => setData({ ...settings, retentionDays: Number(e.target.value) })} /><span>ngày</span></label></div>
+        <Switch label="Chế độ bảo trì" description="Tạm dừng truy cập của người dùng khi hệ thống cần bảo trì." checked={settings.maintenanceMode} onChange={(value) => setData({ ...settings, maintenanceMode: value })} danger />
+      </div>
+      <footer><p>Kiểm tra kỹ chế độ bảo trì trước khi lưu.</p><button className="primary" onClick={() => void save()} disabled={saving}>{saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}{saving ? "Đang lưu…" : "Lưu cài đặt"}</button></footer>
+    </article>
+  </section>;
 }
 
 function Switch({
   label,
+  description,
   checked,
   onChange,
+  danger = false,
 }: {
   label: string;
+  description: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  danger?: boolean;
 }) {
   return (
-    <div className="setting-field switch-setting">
-      <span>{label}</span>
+    <div className={`setting-row${danger ? " danger-setting" : ""}`}>
+      <div><strong>{label}</strong><p>{description}</p></div>
       <button type="button" className={`switch${checked ? " active" : ""}`} role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}>
         <span className="sr-only">{checked ? "Đang bật" : "Đang tắt"}</span>
       </button>
