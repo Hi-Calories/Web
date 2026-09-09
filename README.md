@@ -9,6 +9,6 @@ npm run verify
 npm run dev -- --port 5173 --strictPort
 ```
 
-Set `VITE_API_URL=https://hi-calories-api.onrender.com` for a deployed build.
+Set `VITE_API_URL=https://hi-calories-be.onrender.com` for a deployed build.
 Local development may use `http://localhost:4000`. Do not commit `.env` or
 provider credentials.

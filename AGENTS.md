@@ -24,4 +24,4 @@ application deployed by Vercel.
 
 - Every bug fix has a regression test; every API change has a contract test.
 - Run `npm run verify` before merging and smoke-test the deployed Admin against
-  `https://hi-calories-api.onrender.com` after a release.
+  `https://hi-calories-be.onrender.com` after a release.
