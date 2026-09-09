@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { useAdminFetch } from "./adminHooks";
 import { AiCredentialEditor } from "./AiCredentialEditor";
-import { aiCredentials, credentialsPath, capabilityLabel, type AiModel, type Credential, type CredentialsData } from "../shared/ai-credentials";
+import { AiCredentialUsage } from "./AiCredentialUsage";
+import { aiCredentials, credentialUsagePath, credentialsPath, capabilityLabel, type AiModel, type Credential, type CredentialsData, type CredentialUsageData } from "../shared/ai-credentials";
 import "./ai-credentials.css";
 
 const statusLabel = {
@@ -51,6 +52,8 @@ export function AiCredentialsView() {
   const [retry, setRetry] = useState<(() => void) | null>(null);
   const [notice, setNotice] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [usageDays, setUsageDays] = useState(30);
+  const usage = useAdminFetch<CredentialUsageData>(credentialUsagePath(usageDays));
   const mutate = async (id: string, action: () => Promise<unknown>) => {
     setBusyId(id); setMutationError(null); setNotice(""); setRetry(null);
     try { await action(); setNotice("Đã cập nhật cấu hình."); await refetch(); }
@@ -79,7 +82,7 @@ export function AiCredentialsView() {
 
   return <section className="ai-credentials">
     <header className="ai-page-header">
-      <div><p className="ai-eyebrow">CẤU HÌNH ĐANG SỬ DỤNG</p><h2>API key và chuỗi fallback</h2><p>Hệ thống thử key từ trên xuống; trong mỗi key, model có thứ tự nhỏ hơn được ưu tiên trước.</p></div>
+      <div><h2>API key và chuỗi fallback</h2><p>Hệ thống thử key từ trên xuống; trong mỗi key, model có thứ tự nhỏ hơn được ưu tiên trước.</p></div>
       <div className="ai-actions"><button className="secondary" onClick={refetch} disabled={Boolean(busyId)}><RefreshCw aria-hidden="true" /> Làm mới</button><button className="primary" onClick={() => setAdding(true)} disabled={Boolean(busyId)}><Plus aria-hidden="true" /> Thêm API key</button></div>
     </header>
 
@@ -96,6 +99,7 @@ export function AiCredentialsView() {
     </div>
 
     <p className="ai-security-note"><ShieldCheck aria-hidden="true" /><span><strong>Secret được bảo vệ.</strong> Bạn chỉ thấy fingerprint để nhận diện key. Các key thuộc cùng Google project vẫn dùng chung hạn mức.</span></p>
+    <div className="ai-usage-toolbar"><div><strong>Theo dõi sử dụng từng key</strong><span>Chỉ số vận hành không chứa prompt, ảnh hay dữ liệu người dùng.</span></div><label>Khoảng thời gian<select value={usageDays} onChange={event => setUsageDays(Number(event.target.value))}><option value={7}>7 ngày</option><option value={30}>30 ngày</option><option value={90}>90 ngày</option></select></label></div>
     {notice && <p className="ai-success-message" role="status"><CheckCircle2 aria-hidden="true" /> {notice}</p>}
     {mutationError && <div role="alert" className="login-error"><p>{mutationError}</p><div className="ai-actions"><button className="secondary" disabled={Boolean(busyId)} onClick={() => retry?.()}>Thử lại</button><button className="secondary" onClick={() => { setMutationError(null); setRetry(null); void refetch(); }}>Tải cấu hình mới</button></div></div>}
 
@@ -128,6 +132,7 @@ export function AiCredentialsView() {
             </li>;
           })}</ol>
           <footer className="ai-credential-meta"><span><strong>Thành công gần nhất</strong>{date(credential.lastSuccessAt)}</span><span><strong>Lỗi gần nhất</strong>{date(credential.lastFailureAt)}{credential.lastErrorCode ? ` · HTTP ${credential.lastErrorCode}` : ""}</span><span><strong>Lỗi liên tiếp</strong>{credential.failureCount}</span></footer>
+          <AiCredentialUsage credential={credential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} />
         </article>;
       })}
     </div>
