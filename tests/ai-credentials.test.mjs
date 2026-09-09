@@ -47,6 +47,7 @@ test("credentials screen shows cooldown and safe alert delivery status", async (
   render(React.createElement(AiCredentialsView));
   await waitFor(() => assert.ok(screen.getByText(/Chờ đến/)));
   assert.ok(screen.getByText(/Gửi email chưa thành công/));
-  assert.ok(screen.getByText(/Fingerprint …12345678/));
+  assert.ok(screen.getByText(/API key đã kết nối/));
+  assert.ok(screen.getAllByText(/•••• 12345678/).length >= 1);
   assert.equal(document.querySelector('input[type="password"]'), null);
 });
