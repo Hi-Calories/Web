@@ -1,52 +1,52 @@
-import { Activity, AlertTriangle, Gauge, GitBranch, TimerReset } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { capabilityLabel, type Credential, type CredentialUsageData } from "../shared/ai-credentials";
+import { useState } from "react";
+import { Activity, AlertTriangle, CircleDollarSign, Gauge, GitBranch, ShieldCheck, TimerReset, WalletCards } from "lucide-react";
+import { Area, AreaChart, Bar, CartesianGrid, ComposedChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { aiCredentials, capabilityLabel, type Credential, type CredentialEventsData, type CredentialQuotaData, type CredentialUsageData } from "../shared/ai-credentials";
+import { useAdminFetch } from "./adminHooks";
 
 const number = new Intl.NumberFormat("vi-VN");
+const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
+const date = (value?: string) => value ? new Date(value).toLocaleString("vi-VN") : "Chưa có";
 const shortDate = (value: string) => new Date(`${value}T00:00:00Z`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+type Tab = "overview" | "limits" | "failures" | "security";
 
-export function AiCredentialUsage({ credential, days, data, loading, error, refetch }: { credential: Credential; days: number; data?: CredentialUsageData | null; loading: boolean; error?: string | null; refetch: () => void }) {
+export function AiCredentialUsage({ credential, days, data, loading, error, refetch, onCredentialChanged }: { credential: Credential; days: number; data?: CredentialUsageData | null; loading: boolean; error?: string | null; refetch: () => void; onCredentialChanged?: () => void }) {
+  const [tab, setTab] = useState<Tab>("overview"); const [saving, setSaving] = useState(false); const [budgetError, setBudgetError] = useState("");
+  const events = useAdminFetch<CredentialEventsData>(`/admin/ai-credentials/${credential.id}/events?limit=50`, [credential.id]);
+  const quota = useAdminFetch<CredentialQuotaData>(`/admin/ai-credentials/${credential.id}/quota`, [credential.id]);
   const summary = data?.summaries.find(item => item.credentialId === credential.id);
   const daily = data?.daily.filter(item => item.credentialId === credential.id) ?? [];
   const models = data?.models.filter(item => item.credentialId === credential.id).sort((a, b) => b.requests - a.requests) ?? [];
   const errors = data?.errors.filter(item => item.credentialId === credential.id) ?? [];
   const capabilities = data?.capabilities.filter(item => item.credentialId === credential.id).sort((a, b) => b.requests - a.requests) ?? [];
   const successRate = summary?.requests ? Math.round(summary.successes / summary.requests * 100) : 0;
-
+  const fallbackRate = summary?.requests ? Math.round(summary.fallbacks / summary.requests * 100) : 0;
+  const saveBudget = async (form: FormData) => { setSaving(true); setBudgetError(""); try { const parse = (name: string) => { const value = String(form.get(name) ?? "").trim(); return value ? Number(value) : null; }; await aiCredentials.setBudget(credential, parse("daily"), parse("monthly")); onCredentialChanged?.(); } catch (value) { setBudgetError(value instanceof Error ? value.message : "Không thể lưu ngân sách."); } finally { setSaving(false); } };
   if (loading && !data) return <div className="ai-usage-loading" role="status"><Activity aria-hidden="true" /> Đang tải chỉ số sử dụng…</div>;
   if (error) return <div className="ai-usage-error" role="alert"><AlertTriangle aria-hidden="true" /><span>Không tải được chỉ số sử dụng.</span><button type="button" onClick={refetch}>Thử lại</button></div>;
-  if (!summary?.requests) return <div className="ai-usage-empty"><Gauge aria-hidden="true" /><div><strong>Chưa có lượt gọi trong {days} ngày</strong><span>Biểu đồ sẽ xuất hiện sau khi key này xử lý yêu cầu AI đầu tiên.</span></div></div>;
 
   return <section className="ai-usage" aria-label={`Chỉ số sử dụng ${credential.label}`}>
-    <div className="ai-usage-kpis">
-      <span><Activity aria-hidden="true" /><small>Lượt gọi</small><strong>{number.format(summary.requests)}</strong></span>
-      <span><Gauge aria-hidden="true" /><small>Thành công</small><strong>{successRate}%</strong></span>
-      <span><TimerReset aria-hidden="true" /><small>Độ trễ TB / P95</small><strong>{number.format(summary.averageLatencyMs)} / {number.format(summary.p95LatencyMs)} ms</strong></span>
-      <span><GitBranch aria-hidden="true" /><small>Lượt fallback</small><strong>{number.format(summary.fallbacks)}</strong></span>
-    </div>
-    <div className="ai-usage-grid">
-      <div className="ai-usage-chart">
-        <header><strong>Xu hướng yêu cầu</strong><span>Thành công và thất bại theo ngày</span></header>
-        <ResponsiveContainer width="100%" height={210}>
-          <AreaChart data={daily} margin={{ top: 12, right: 8, left: -22, bottom: 0 }}>
-            <defs><linearGradient id={`success-${credential.id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16915a" stopOpacity={.24}/><stop offset="100%" stopColor="#16915a" stopOpacity={0}/></linearGradient></defs>
-            <CartesianGrid stroke="#e4ebe7" vertical={false} />
-            <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#687970" }} axisLine={false} tickLine={false} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#687970" }} axisLine={false} tickLine={false} />
-            <Tooltip labelFormatter={value => `Ngày ${shortDate(String(value))}`} formatter={(value, name) => [number.format(Number(value)), name === "successes" ? "Thành công" : "Thất bại"]} />
-            <Area type="monotone" dataKey="successes" stroke="#16915a" strokeWidth={2} fill={`url(#success-${credential.id})`} />
-            <Area type="monotone" dataKey="failures" stroke="#c44848" strokeWidth={2} fill="transparent" />
-          </AreaChart>
-        </ResponsiveContainer>
+    <nav className="ai-ops-tabs" aria-label="Chi tiết vận hành">{([['overview','Tổng quan'],['limits','Model & hạn mức'],['failures','Lỗi & fallback'],['security','Bảo mật & lịch sử']] as [Tab,string][]).map(([id,label]) => <button type="button" key={id} className={tab === id ? "is-active" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}>{label}</button>)}</nav>
+    {tab === "overview" && <>
+      <div className="ai-data-provenance"><span><i className="local" />Đo bởi Hi‑Calories</span><span><i className="estimate" />Chi phí ước tính</span><small>Cập nhật {date(data?.generatedAt)}</small></div>
+      <div className="ai-usage-kpis">
+        <span><Activity/><small>Lượt gọi</small><strong>{number.format(summary?.requests ?? 0)}</strong><em>Đỉnh {summary?.peakRpm ?? 0} RPM</em></span>
+        <span><Gauge/><small>Thành công</small><strong>{successRate}%</strong><em>{summary?.failures ?? 0} lỗi</em></span>
+        <span><TimerReset/><small>P95 / P99</small><strong>{number.format(summary?.p95LatencyMs ?? 0)} / {number.format(summary?.p99LatencyMs ?? 0)} ms</strong><em>TB {number.format(summary?.averageLatencyMs ?? 0)} ms</em></span>
+        <span><CircleDollarSign/><small>Chi phí ước tính</small><strong>{money.format(summary?.estimatedCostUsd ?? 0)}</strong><em>{number.format((summary?.inputTokens ?? 0) + (summary?.outputTokens ?? 0))} token</em></span>
+        <span><GitBranch/><small>Fallback</small><strong>{fallbackRate}%</strong><em>{summary?.fallbacks ?? 0} lượt</em></span>
       </div>
-      <div className="ai-usage-breakdown">
-        <header><strong>Theo chức năng</strong><span>Tỷ lệ thành công thực tế</span></header>
-        <ul>{capabilities.map(item => <li key={item.capability}><div><span>{capabilityLabel[item.capability]}</span><strong>{item.requests ? Math.round(item.successes / item.requests * 100) : 0}%</strong></div><progress max={item.requests || 1} value={item.successes} /><small>{number.format(item.successes)}/{number.format(item.requests)} thành công</small></li>)}</ul>
+      <div className="ai-usage-grid">
+        <div className="ai-usage-chart"><header><strong>Lưu lượng và fallback</strong><span>Yêu cầu thành công, thất bại và lượt chuyển tuyến</span></header><ResponsiveContainer width="100%" height={240}><AreaChart data={daily}><CartesianGrid stroke="#e4ebe7" vertical={false}/><XAxis dataKey="date" tickFormatter={shortDate}/><YAxis allowDecimals={false}/><Tooltip/><Legend/><Area type="monotone" dataKey="successes" name="Thành công" stroke="#168052" fill="#e4f4eb"/><Area type="monotone" dataKey="failures" name="Thất bại" stroke="#c44848" fill="transparent"/><Area type="monotone" dataKey="fallbacks" name="Fallback" stroke="#b87512" fill="transparent"/></AreaChart></ResponsiveContainer></div>
+        <div className="ai-usage-breakdown"><header><strong>Theo chức năng</strong><span>Tỷ lệ thành công thực tế</span></header><ul>{capabilities.length ? capabilities.map(item => <li key={item.capability}><div><span>{capabilityLabel[item.capability]}</span><strong>{item.requests ? Math.round(item.successes / item.requests * 100) : 0}%</strong></div><progress max={item.requests || 1} value={item.successes}/><small>{number.format(item.successes)}/{number.format(item.requests)} thành công</small></li>) : <li className="ai-zero-row">Chưa có dữ liệu trong kỳ</li>}</ul></div>
       </div>
-    </div>
-    <div className="ai-usage-table-wrap">
-      <table className="ai-usage-table"><caption>Hiệu suất từng model</caption><thead><tr><th>Model / chức năng</th><th>Yêu cầu</th><th>Thành công</th><th>Lỗi</th><th>Độ trễ TB</th></tr></thead><tbody>{models.map(item => <tr key={`${item.capability}:${item.model}`}><td><strong>{item.model}</strong><small>{capabilityLabel[item.capability]}</small></td><td>{number.format(item.requests)}</td><td>{number.format(item.successes)}</td><td>{number.format(item.failures)}</td><td>{number.format(item.averageLatencyMs)} ms</td></tr>)}</tbody></table>
-    </div>
-    <div className="ai-usage-errors"><strong>Mã lỗi ghi nhận</strong>{errors.length ? errors.map(item => <span key={item.statusCode}>HTTP {item.statusCode || "mạng/timeout"}<b>{number.format(item.count)}</b></span>) : <span>Không có lỗi trong kỳ</span>}</div>
+      <div className="ai-usage-chart ai-cost-chart"><header><strong>Token và chi phí</strong><span>Chi phí được tính theo bảng giá nội bộ tại thời điểm gọi</span></header><ResponsiveContainer width="100%" height={220}><ComposedChart data={daily}><CartesianGrid stroke="#e4ebe7" vertical={false}/><XAxis dataKey="date" tickFormatter={shortDate}/><YAxis yAxisId="tokens"/><YAxis yAxisId="cost" orientation="right"/><Tooltip/><Legend/><Bar yAxisId="tokens" dataKey="tokens" name="Token" fill="#255d46" radius={[4,4,0,0]}/><Area yAxisId="cost" type="monotone" dataKey="estimatedCostUsd" name="USD ước tính" stroke="#b87512" fill="transparent"/></ComposedChart></ResponsiveContainer></div>
+    </>}
+    {tab === "limits" && <div className="ai-ops-pane"><div className="ai-provider-scope"><ShieldCheck/><div><strong>{quota.data?.available ? "Hạn mức provider đã ghi nhận" : "Chưa nhận được hạn mức từ provider"}</strong><p>{quota.data?.warning ?? "OpenAI quota được lấy từ response header khi provider trả về."}</p></div><span>{quota.data?.source === "provider" ? "Provider báo cáo" : "Đo bởi Hi‑Calories"}</span></div><div className="ai-limit-grid"><Quota label="Request còn lại" value={quota.data?.snapshot?.rateLimit?.remainingRequests} limit={quota.data?.snapshot?.rateLimit?.limitRequests} reset={quota.data?.snapshot?.rateLimit?.resetRequestsAt}/><Quota label="Token còn lại" value={quota.data?.snapshot?.rateLimit?.remainingTokens} limit={quota.data?.snapshot?.rateLimit?.limitTokens} reset={quota.data?.snapshot?.rateLimit?.resetTokensAt}/><Quota label="Request hôm nay" value={summary?.requestsToday ?? 0}/><Quota label="RPM cao nhất" value={summary?.peakRpm ?? 0}/></div><ModelTable models={models}/></div>}
+    {tab === "failures" && <div className="ai-ops-pane"><div className="ai-usage-errors"><strong>Mã lỗi ghi nhận</strong>{errors.length ? errors.map(item => <span key={item.statusCode}>HTTP {item.statusCode || "mạng/timeout"}<b>{number.format(item.count)}</b></span>) : <span>Không có lỗi trong kỳ</span>}</div><div className="ai-event-table"><table><caption>50 lần gọi gần nhất — không chứa prompt hoặc dữ liệu người dùng</caption><thead><tr><th>Thời gian</th><th>Model</th><th>Kết quả</th><th>Độ trễ</th><th>Fallback</th><th>Chi phí</th></tr></thead><tbody>{events.data?.events?.length ? events.data.events.map((item,index) => <tr key={`${item.createdAt}-${index}`}><td>{date(item.createdAt)}</td><td><strong>{item.model}</strong><small>{capabilityLabel[item.capability]}</small></td><td className={item.outcome}>{item.outcome === "success" ? "Thành công" : `Lỗi ${item.statusCode || "mạng"}`}</td><td>{number.format(item.latencyMs)} ms</td><td>#{item.fallbackIndex + 1}</td><td>{money.format(item.estimatedCostUsd ?? 0)}</td></tr>) : <tr><td colSpan={6}>Chưa có sự kiện trong kỳ</td></tr>}</tbody></table></div></div>}
+    {tab === "security" && <div className="ai-ops-pane"><dl className="ai-security-facts"><div><dt>Fingerprint</dt><dd>{credential.keyFingerprint}</dd></div><div><dt>Thay key gần nhất</dt><dd>{date(credential.rotatedAt)}</dd></div><div><dt>Kiểm tra gần nhất</dt><dd>{date(credential.lastValidatedAt)}</dd></div><div><dt>Lỗi liên tiếp</dt><dd>{credential.failureCount}</dd></div></dl><form className="ai-budget-form" action={form => void saveBudget(form)}><WalletCards/><div><strong>Ngân sách cảnh báo</strong><p>Chi phí nội bộ là ước tính; billing provider vẫn là nguồn quyết toán.</p></div><label>USD / ngày<input name="daily" type="number" min="0" step="0.01" defaultValue={credential.dailyBudgetUsd}/></label><label>USD / tháng<input name="monthly" type="number" min="0" step="0.01" defaultValue={credential.monthlyBudgetUsd}/></label><button className="primary" disabled={saving}>{saving ? "Đang lưu…" : "Lưu ngân sách"}</button>{budgetError && <p role="alert">{budgetError}</p>}</form></div>}
   </section>;
 }
+
+function Quota({ label, value, limit, reset }: { label: string; value?: number; limit?: number; reset?: string }) { const used = limit !== undefined && value !== undefined ? Math.max(0, limit - value) : 0; return <div><span>{label}</span><strong>{value === undefined ? "Chưa có" : number.format(value)}{limit !== undefined ? ` / ${number.format(limit)}` : ""}</strong>{limit !== undefined && <progress max={limit || 1} value={used}/>}<small>{reset ? `Đặt lại ${date(reset)}` : "Dữ liệu gần nhất"}</small></div>; }
+function ModelTable({ models }: { models: CredentialUsageData['models'] }) { return <div className="ai-usage-table-wrap"><table className="ai-usage-table"><caption>Hiệu suất từng model</caption><thead><tr><th>Model / chức năng</th><th>Yêu cầu</th><th>Thành công</th><th>Token</th><th>Chi phí</th><th>Độ trễ TB</th></tr></thead><tbody>{models.length ? models.map(item => <tr key={`${item.capability}:${item.model}`}><td><strong>{item.model}</strong><small>{capabilityLabel[item.capability]}</small></td><td>{number.format(item.requests)}</td><td>{number.format(item.successes)}</td><td>{number.format(item.tokens ?? 0)}</td><td>{money.format(item.estimatedCostUsd ?? 0)}</td><td>{number.format(item.averageLatencyMs)} ms</td></tr>) : <tr><td colSpan={6}>Chưa có dữ liệu trong kỳ</td></tr>}</tbody></table></div>; }

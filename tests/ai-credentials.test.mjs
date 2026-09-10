@@ -50,6 +50,7 @@ test("credentials screen shows cooldown and safe alert delivery status", async (
   assert.ok(screen.getByText(/API key đã kết nối/));
   assert.ok(screen.getAllByText(/•••• 12345678/).length >= 1);
   assert.ok(screen.getAllByText("80%").length >= 1);
+  fireEvent.click(screen.getByText("Lỗi & fallback"));
   assert.ok(screen.getByText(/HTTP 429/));
   assert.equal(document.querySelector('input[type="password"]'), null);
 });
