@@ -32,6 +32,7 @@ const eventLabel: Record<string, string> = {
   credential_disabled: "Key bị vô hiệu hóa",
   model_disabled: "Model không khả dụng",
   fallback_exhausted: "Đã thử hết cấu hình AI",
+  budget_threshold: "Ngân sách AI đạt ngưỡng cảnh báo",
 };
 const providerLabel = { gemini: "Google Gemini", openai: "OpenAI" };
 const date = (value?: string) => value ? new Date(value).toLocaleString("vi-VN") : "Chưa có";
@@ -105,7 +106,7 @@ export function AiCredentialsView() {
     </div>
 
     <p className="ai-security-note"><ShieldCheck aria-hidden="true" /><span><strong>Secret được bảo vệ.</strong> Bạn chỉ thấy fingerprint để nhận diện key. Các key thuộc cùng Google project vẫn dùng chung hạn mức.</span></p>
-    <div className="ai-usage-toolbar"><div><strong>Theo dõi sử dụng từng key</strong><span>Chỉ số vận hành không chứa prompt, ảnh hay dữ liệu người dùng.</span></div><label>Khoảng thời gian<select value={usageDays} onChange={event => setUsageDays(Number(event.target.value))}><option value={7}>7 ngày</option><option value={30}>30 ngày</option><option value={90}>90 ngày</option></select></label></div>
+    <div className="ai-usage-toolbar"><div><strong>AI Operations Console</strong><span>Lưu lượng, token, chi phí, quota, độ ổn định và fallback theo từng key.</span></div><label>Khoảng thời gian<select value={usageDays} onChange={event => setUsageDays(Number(event.target.value))}><option value={1}>24 giờ</option><option value={7}>7 ngày</option><option value={30}>30 ngày</option><option value={90}>90 ngày</option></select></label></div>
     {notice && <p className="ai-success-message" role="status"><CheckCircle2 aria-hidden="true" /> {notice}</p>}
     {mutationError && <div role="alert" className="login-error"><p>{mutationError}</p><div className="ai-actions"><button className="secondary" disabled={Boolean(busyId)} onClick={() => retry?.()}>Thử lại</button><button className="secondary" onClick={() => { setMutationError(null); setRetry(null); void refetch(); }}>Tải cấu hình mới</button></div></div>}
 
@@ -146,7 +147,7 @@ export function AiCredentialsView() {
             </li>;
           })}</ol>
           <footer className="ai-credential-meta"><span><strong>Thành công gần nhất</strong>{date(selectedCredential.lastSuccessAt)}</span><span><strong>Lỗi gần nhất</strong>{date(selectedCredential.lastFailureAt)}{selectedCredential.lastErrorCode ? ` · HTTP ${selectedCredential.lastErrorCode}` : ""}</span><span><strong>Lỗi liên tiếp</strong>{selectedCredential.failureCount}</span></footer>
-          <AiCredentialUsage credential={selectedCredential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} />
+          <AiCredentialUsage credential={selectedCredential} days={usageDays} data={usage.data} loading={usage.loading} error={usage.error} refetch={usage.refetch} onCredentialChanged={() => void refetch()} />
         </article>
       </main>
     </div>}

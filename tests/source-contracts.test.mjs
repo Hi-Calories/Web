@@ -105,4 +105,11 @@ test("AI credentials UI keeps secrets write-only and exposes fallback controls",
   assert.match(view, /Copy fingerprint/);
   assert.match(view, /Dùng key ••••/);
   assert.doesNotMatch(view, /clipboard\.writeText\([^)]*apiKey/);
+  const usage = read("src/app/AiCredentialUsage.tsx");
+  assert.match(usage, /Tổng quan/);
+  assert.match(usage, /Model & hạn mức/);
+  assert.match(usage, /Lỗi & fallback/);
+  assert.match(usage, /Bảo mật & lịch sử/);
+  assert.match(usage, /Chi phí ước tính/);
+  assert.doesNotMatch(usage, /prompt\s*:/);
 });
